@@ -1,0 +1,92 @@
+[
+  {
+    "id": "seed-1",
+    "playerName": "PHANTOM_ACE",
+    "carName": "Hyperion RS",
+    "score": 184500,
+    "distance": 14200,
+    "topSpeed": 332,
+    "timestamp": 1792728095935,
+    "country": "JP"
+  },
+  {
+    "id": "seed-2",
+    "playerName": "MIDNIGHT_VIPER",
+    "carName": "Cyber Horizon",
+    "score": 152800,
+    "distance": 12100,
+    "topSpeed": 298,
+    "timestamp": 1792713695935,
+    "country": "US"
+  },
+  {
+    "id": "seed-3",
+    "playerName": "TURBO_VALKYRIE",
+    "carName": "Apex GT",
+    "score": 126400,
+    "distance": 10450,
+    "topSpeed": 268,
+    "timestamp": 1792692095935,
+    "country": "DE"
+  },
+  {
+    "id": "seed-4",
+    "playerName": "V8_THUNDER",
+    "carName": "Phantom V8",
+    "score": 114200,
+    "distance": 9800,
+    "topSpeed": 274,
+    "timestamp": 1792670495935,
+    "country": "AU"
+  },
+  {
+    "id": "seed-5",
+    "playerName": "NEON_RUNNER",
+    "carName": "Cyber Horizon",
+    "score": 98600,
+    "distance": 8250,
+    "topSpeed": 265,
+    "timestamp": 1792648895935,
+    "country": "GB"
+  },
+  {
+    "id": "seed-6",
+    "playerName": "DRIFT_GHOST",
+    "carName": "Apex GT",
+    "score": 87400,
+    "distance": 7400,
+    "topSpeed": 252,
+    "timestamp": 1792627295935,
+    "country": "FR"
+  },
+  {
+    "id": "seed-7",
+    "playerName": "HIGHWAY_HAWK",
+    "carName": "Phantom V8",
+    "score": 76200,
+    "distance": 6900,
+    "topSpeed": 248,
+    "timestamp": 1792605695935,
+    "country": "CA"
+  },
+  {
+    "id": "seed-8",
+    "playerName": "REDLINE_KID",
+    "carName": "Apex GT",
+    "score": 62500,
+    "distance": 5800,
+    "topSpeed": 242,
+    "timestamp": 1792584095935,
+    "country": "BR"
+  },
+  {
+    "id": "entry-1792735491206-9510",
+    "playerName": "TEST_RACER",
+    "carName": "Apex GT",
+    "score": 130000,
+    "distance": 11000,
+    "topSpeed": 275,
+    "timestamp": 1792735491206,
+    "country": "BR"
+  }
+]

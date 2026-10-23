@@ -1,0 +1,6 @@
+{
+  "name": "Road Legends: Open Road 3D",
+  "description": "An exhilarating 3D open-road driving game with dynamic weather transitions, procedural traffic, drafting rivals, procedural exhaust physics, and garage customization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
