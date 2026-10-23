@@ -478,7 +478,7 @@ export default function App() {
         ref={canvasMountRef}
         className="absolute inset-0 w-full h-full game-touch-surface"
      SpeedInsights/ 
-      CatAnalytics/>
+      CatAnalytics/
 
       {/* Start Menu Overlay */}
       {gameMode === 'menu' && (
@@ -636,6 +636,9 @@ export default function App() {
           onClose={() => setIsSettingsOpen(false)}
         />
       )}
+
+      {/* Vercel Speed Insights */}
+      <SpeedInsights />
     </div>
   );
 }
