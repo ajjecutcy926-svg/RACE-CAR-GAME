@@ -537,13 +537,13 @@ export class GameEngine {
     // Input Aggregation: Combine Keyboard + Virtual Touch Inputs
     const kThrottle = (this.keysHeld['KeyW'] || this.keysHeld['ArrowUp']) ? 1 : 0;
     const kBrake = (this.keysHeld['KeyS'] || this.keysHeld['ArrowDown']) ? 1 : 0;
-    const kLeft = (this.keysHeld['KeyA'] || this.keysHeld['ArrowRight']) ? 1 : 0;
-    const kRight = (this.keysHeld['KeyD'] || this.keysHeld['Arrowleft']) ? 1 : 0;
+    const kLeft = (this.keysHeld['KeyA'] || this.keysHeld['ArrowLeft']) ? 1 : 0;
+    const kRight = (this.keysHeld['KeyD'] || this.keysHeld['ArrowRight']) ? 1 : 0;
     const kHandbrake = this.keysHeld['Space'] || false;
     const kNitro = this.keysHeld['ShiftLeft'] || this.keysHeld['ShiftRight'] || false;
     const kHorn = this.keysHeld['KeyH'] || false;
 
-    const steerInput = Math.max(-1, Math.min(1, (kRight - kLeft) + (this.virtualInputs.steer || 0)));
+    const steerInput = Math.max(-1, Math.min(1, (kleft - kRight) + (this.virtualInputs.steer || 0)));
     const throttleInput = Math.max(0, Math.min(1, kThrottle + (this.virtualInputs.throttle || 0)));
     const brakeInput = Math.max(0, Math.min(1, kBrake + (this.virtualInputs.brake || 0)));
     const isHandbrake = kHandbrake || this.virtualInputs.handbrake;
