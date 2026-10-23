@@ -537,8 +537,8 @@ export class GameEngine {
     // Input Aggregation: Combine Keyboard + Virtual Touch Inputs
     const kThrottle = (this.keysHeld['KeyW'] || this.keysHeld['ArrowUp']) ? 1 : 0;
     const kBrake = (this.keysHeld['KeyS'] || this.keysHeld['ArrowDown']) ? 1 : 0;
-    const kLeft = (this.keysHeld['KeyA'] || this.keysHeld['ArrowLeft']) ? 1 : 0;
-    const kRight = (this.keysHeld['KeyD'] || this.keysHeld['ArrowRight']) ? 1 : 0;
+    const kLeft = (this.keysHeld['KeyA'] || this.keysHeld['ArrowRight']) ? 1 : 0;
+    const kRight = (this.keysHeld['KeyD'] || this.keysHeld['Arrowleft']) ? 1 : 0;
     const kHandbrake = this.keysHeld['Space'] || false;
     const kNitro = this.keysHeld['ShiftLeft'] || this.keysHeld['ShiftRight'] || false;
     const kHorn = this.keysHeld['KeyH'] || false;
