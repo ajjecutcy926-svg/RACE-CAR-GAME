@@ -476,7 +476,7 @@ export default function App() {
       <div
         ref={canvasMountRef}
         className="absolute inset-0 w-full h-full game-touch-surface"
-    SpeedInsights />
+      />
 
       {/* Start Menu Overlay */}
       {gameMode === 'menu' && (
