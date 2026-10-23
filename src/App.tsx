@@ -17,6 +17,7 @@ import { PhotoMode } from './components/PhotoMode.tsx';
 import { LevelSelectModal } from './components/LevelSelectModal.tsx';
 import { LevelCompleteModal } from './components/LevelCompleteModal.tsx';
 import { SpeedInsights } from "@vercel/speed-insights/react"
+import { Analytics } from "@vercel/analytics/react"
 type GameMode = 'menu' | 'playing' | 'paused' | 'gameover' | 'photo';
 
 export default function App() {
@@ -476,7 +477,7 @@ export default function App() {
       <div
         ref={canvasMountRef}
         className="absolute inset-0 w-full h-full game-touch-surface"
-      />
+    analytics  />
 
       {/* Start Menu Overlay */}
       {gameMode === 'menu' && (
