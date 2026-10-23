@@ -36,7 +36,7 @@ export const StartMenu: React.FC<StartMenuProps> = ({
   dailyChallengeCount,
 }) => {
   return (
-    <div className="absolute inset-0 z-30 flex flex-col justify-between p-6 sm:p-10 bg-gradient-to-t from-slate-950/95 via-slate-950/40 to-transparent pointer-events-auto"
+    <div className="absolute inset-0 z-30 flex flex-col justify-between p-6 sm:p-10 bg-gradient-to-t from-slate-950/95 via-slate-950/40 to-transparent pointer-events-auto">
       <div className="absolute top-4 right-4">Made by Ali Haider App</div>
       {/* Top Header: Coins & Records */}
       <div className="flex items-center justify-between w-full max-w-6xl mx-auto">
