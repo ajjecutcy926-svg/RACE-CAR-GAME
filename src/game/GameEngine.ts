@@ -543,7 +543,7 @@ export class GameEngine {
     const kNitro = this.keysHeld['ShiftLeft'] || this.keysHeld['ShiftRight'] || false;
     const kHorn = this.keysHeld['KeyH'] || false;
 
-    const steerInput = Math.max(-1, Math.min(1, (kleft - kRight) + (this.virtualInputs.steer || 0)));
+    const steerInput = Math.max(-1, Math.min(1, (kLeft - kRight) + (this.virtualInputs.steer || 0)));
     const throttleInput = Math.max(0, Math.min(1, kThrottle + (this.virtualInputs.throttle || 0)));
     const brakeInput = Math.max(0, Math.min(1, kBrake + (this.virtualInputs.brake || 0)));
     const isHandbrake = kHandbrake || this.virtualInputs.handbrake;
