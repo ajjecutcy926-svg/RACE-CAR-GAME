@@ -16,7 +16,7 @@ import { GlobalLeaderboard } from './components/GlobalLeaderboard.tsx';
 import { PhotoMode } from './components/PhotoMode.tsx';
 import { LevelSelectModal } from './components/LevelSelectModal.tsx';
 import { LevelCompleteModal } from './components/LevelCompleteModal.tsx';
-
+import { SpeedInsights } from "@vercel/speed-insights/react"
 type GameMode = 'menu' | 'playing' | 'paused' | 'gameover' | 'photo';
 
 export default function App() {
