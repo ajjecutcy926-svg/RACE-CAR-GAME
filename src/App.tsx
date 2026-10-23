@@ -477,7 +477,7 @@ export default function App() {
       <div
         ref={canvasMountRef}
         className="absolute inset-0 w-full h-full game-touch-surface"
-    analytics  />
+      />
 
       {/* Start Menu Overlay */}
       {gameMode === 'menu' && (
@@ -638,6 +638,9 @@ export default function App() {
 
       {/* Vercel Speed Insights */}
       <SpeedInsights />
+      
+      {/* Vercel Web Analytics */}
+      <Analytics />
     </div>
   );
 }
