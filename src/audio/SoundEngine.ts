@@ -769,6 +769,60 @@ export class SoundEngine {
     noise.start(now + 0.5);
   }
 
+  /**
+   * Milestone Achievement Unlock Audio:
+   * Ascending crystal chime arpeggio (C5 -> E5 -> G5 -> C6) with warm sub thump and harmonic shimmer.
+   */
+  public playAchievementUnlocked() {
+    if (!this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+
+    const chimeNotes = [
+      { freq: 523.25, time: 0.0, dur: 0.28 },
+      { freq: 659.25, time: 0.08, dur: 0.28 },
+      { freq: 783.99, time: 0.16, dur: 0.35 },
+      { freq: 1046.5, time: 0.26, dur: 0.8 },
+      { freq: 1318.51, time: 0.28, dur: 0.7 },
+    ];
+
+    chimeNotes.forEach(({ freq, time, dur }) => {
+      if (!this.ctx || !this.sfxGain) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const filter = this.ctx.createBiquadFilter();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now + time);
+
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(freq * 1.2, now + time);
+      filter.Q.setValueAtTime(2.5, now + time);
+
+      gain.gain.setValueAtTime(0.32, now + time);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + time + dur);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.sfxGain);
+
+      osc.start(now + time);
+      osc.stop(now + time + dur);
+    });
+
+    // Sub Bass Warm Thump
+    const subOsc = this.ctx.createOscillator();
+    const subGain = this.ctx.createGain();
+    subOsc.type = 'sine';
+    subOsc.frequency.setValueAtTime(140, now);
+    subOsc.frequency.exponentialRampToValueAtTime(55, now + 0.3);
+    subGain.gain.setValueAtTime(0.4, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    subOsc.connect(subGain);
+    subGain.connect(this.sfxGain);
+    subOsc.start(now);
+    subOsc.stop(now + 0.35);
+  }
+
 
   /**
    * Generates a short noise burst for snares and hi-hats.

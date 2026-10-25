@@ -1,11 +1,11 @@
-import React from 'react';
-import { Camera, Home, MapPin, Play, RotateCcw, Settings, Trophy } from 'lucide-react';
+import { Award, Camera, Home, MapPin, Play, RotateCcw, Settings, Trophy } from 'lucide-react';
 
 interface PauseModalProps {
   onResume: () => void;
   onRespawnAtCheckpoint: () => void;
   onRestart: () => void;
   onOpenLevelSelect?: () => void;
+  onOpenAchievements?: () => void;
   onEnterPhotoMode: () => void;
   onOpenSettings: () => void;
   onQuitToMenu: () => void;
@@ -16,6 +16,7 @@ export const PauseModal: React.FC<PauseModalProps> = ({
   onRespawnAtCheckpoint,
   onRestart,
   onOpenLevelSelect,
+  onOpenAchievements,
   onEnterPhotoMode,
   onOpenSettings,
   onQuitToMenu,
@@ -59,14 +60,21 @@ export const PauseModal: React.FC<PauseModalProps> = ({
               <Camera className="w-4 h-4 text-cyan-400" /> PHOTO (P)
             </button>
 
-            {onOpenLevelSelect && (
+            {onOpenAchievements ? (
+              <button
+                onClick={onOpenAchievements}
+                className="py-2.5 rounded-xl bg-amber-950/60 hover:bg-amber-900/60 border border-amber-500/40 text-amber-300 font-racing font-bold text-xs tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer"
+              >
+                <Award className="w-4 h-4 text-amber-400" /> ACHIEVEMENTS
+              </button>
+            ) : onOpenLevelSelect ? (
               <button
                 onClick={onOpenLevelSelect}
                 className="py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-racing font-bold text-xs tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer"
               >
                 <Trophy className="w-4 h-4 text-amber-400" /> LEVELS
               </button>
-            )}
+            ) : null}
           </div>
 
           <div className="grid grid-cols-2 gap-2 w-full">

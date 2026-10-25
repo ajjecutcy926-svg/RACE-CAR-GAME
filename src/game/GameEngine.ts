@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { CarConfig, GameSettings, GameSummary, LevelCompleteSummary, LevelConfig, PlayerCarState } from '../types.ts';
+import { CarConfig, EngineDiagnostics, GameSettings, GameSummary, LevelCompleteSummary, LevelConfig, PlayerCarState } from '../types.ts';
 import { soundManager } from '../audio/SoundEngine.ts';
 import { CarFactory, CarModelInstance } from './CarFactory.ts';
 import { EnvironmentManager } from './Environment.ts';
@@ -101,11 +101,18 @@ export class GameEngine {
     heightOffset: 0.8,
   };
 
+  // Real-Time Engine Diagnostics Telemetry
+  private showDiagnostics = false;
+  private frameCount = 0;
+  private lastFpsTimestamp = 0;
+  private currentFps = 60;
+  private currentFrameTimeMs = 16.6;
+
   // Callbacks to UI
   private onStateUpdate: (state: PlayerCarState) => void;
   private onGameOver: (summary: GameSummary) => void;
   private onLevelComplete?: (summary: LevelCompleteSummary) => void;
-  private onPopupNotification: (text: string, type: 'near_miss' | 'rival' | 'speed') => void;
+  private onPopupNotification: (text: string, type: 'near_miss' | 'rival' | 'speed' | 'weather' | 'radio') => void;
 
   constructor(
     container: HTMLDivElement,
@@ -114,13 +121,14 @@ export class GameEngine {
     settings: GameSettings,
     onStateUpdate: (state: PlayerCarState) => void,
     onGameOver: (summary: GameSummary) => void,
-    onPopupNotification: (text: string, type: 'near_miss' | 'rival' | 'speed') => void,
+    onPopupNotification: (text: string, type: 'near_miss' | 'rival' | 'speed' | 'weather' | 'radio') => void,
     onLevelComplete?: (summary: LevelCompleteSummary) => void
   ) {
     this.container = container;
     this.currentCarConfig = carConfig;
     this.carColorHex = parseInt(carColor.replace('#', '0x'), 16);
     this.cameraMode = settings.cameraMode;
+    this.showDiagnostics = settings.showDiagnostics ?? false;
     this.onStateUpdate = onStateUpdate;
     this.onGameOver = onGameOver;
     this.onPopupNotification = onPopupNotification;
@@ -203,6 +211,14 @@ export class GameEngine {
     this.scene.add(this.particleSystem.group);
 
     this.weatherManager = new WeatherManager(this.scene, this.dirLight, this.hemiLight);
+    this.weatherManager.onWeatherAlert = (msg, alertType) => {
+      this.onPopupNotification(msg, 'weather');
+      if (alertType === 'cleared') {
+        this.currentScore += 350;
+        this.coinsEarned += 30;
+        soundManager.playCoin();
+      }
+    };
 
     // Initialize with Level 1
     this.applyLevel(this.currentLevelConfig);
@@ -267,6 +283,40 @@ export class GameEngine {
     if (this.cameraMode === 'chase-close') this.cameraMode = 'chase-far';
     else if (this.cameraMode === 'chase-far') this.cameraMode = 'cockpit';
     else this.cameraMode = 'chase-close';
+  }
+
+  public setShowDiagnostics(enabled: boolean) {
+    this.showDiagnostics = enabled;
+  }
+
+  public getDiagnostics(): EngineDiagnostics {
+    const info = this.renderer.info;
+    const calls = info.render.calls;
+    const triangles = info.render.triangles;
+    const geometries = info.memory.geometries;
+    const textures = info.memory.textures;
+
+    // Estimate GPU VRAM footprint based on active WebGL buffers & textures
+    const textureMemMb = textures * 2.8;
+    const geomMemMb = geometries * 0.45;
+    const baseBuffersMb = this.renderer.shadowMap.enabled ? 22.0 : 12.0;
+    const totalGpuMb = Number((textureMemMb + geomMemMb + baseBuffersMb).toFixed(1));
+
+    let jsHeapMb: number | undefined;
+    if (typeof performance !== 'undefined' && (performance as any).memory?.usedJSHeapSize) {
+      jsHeapMb = Number(((performance as any).memory.usedJSHeapSize / (1024 * 1024)).toFixed(1));
+    }
+
+    return {
+      fps: this.currentFps,
+      frameTimeMs: this.currentFrameTimeMs,
+      drawCalls: calls,
+      triangles,
+      geometries,
+      textures,
+      gpuMemoryMb: totalGpuMb,
+      jsHeapMb,
+    };
   }
 
   public setVirtualInput(name: keyof typeof this.virtualInputs, value: number | boolean) {
@@ -500,6 +550,19 @@ export class GameEngine {
   private gameLoop = (timestamp: number) => {
     if (!this.isRunning || (this.isPaused && !this.isPhotoMode)) return;
 
+    // Track live FPS and frame rendering time
+    this.frameCount++;
+    if (this.lastFpsTimestamp === 0) {
+      this.lastFpsTimestamp = timestamp;
+    }
+    const elapsedSinceLastFps = timestamp - this.lastFpsTimestamp;
+    if (elapsedSinceLastFps >= 250) {
+      this.currentFps = Math.max(1, Math.round((this.frameCount * 1000) / elapsedSinceLastFps));
+      this.currentFrameTimeMs = Number((elapsedSinceLastFps / this.frameCount).toFixed(1));
+      this.frameCount = 0;
+      this.lastFpsTimestamp = timestamp;
+    }
+
     const rawDelta = (timestamp - this.lastTime) / 1000;
     this.lastTime = timestamp;
     // Clamp frame delta time to prevent physics clipping during stutters
@@ -668,7 +731,8 @@ export class GameEngine {
     }
 
     // Steering, Lateral Drift & Grip Dynamics
-    const gripFactor = this.currentCarConfig.handling * (this.weatherManager.isWetRoad() ? 0.78 : 1.0);
+    const weatherGrip = this.weatherManager.getGripModifier();
+    const gripFactor = this.currentCarConfig.handling * weatherGrip;
     const speedRatio = Math.min(1.0, Math.abs(this.speedKmh) / 80);
     const steerResponsiveness = 1.8 * gripFactor * (0.4 + speedRatio * 0.6);
 
@@ -715,15 +779,21 @@ export class GameEngine {
       this.speedKmh
     );
 
-    // Lateral Movement (X velocity)
+    // Lateral Movement (X velocity) with crosswind force from sandstorms/storms
     const lateralSpeed = steerInput * 12.0 * gripFactor * (targetSpeedMs / 35);
+    const windForce = this.weatherManager.getWindForce();
     this.playerVelocity.x = THREE.MathUtils.damp(
       this.playerVelocity.x,
-      lateralSpeed,
+      lateralSpeed + windForce * 1.5,
       8.0,
       delta
     );
     this.playerVelocity.z = targetSpeedMs;
+
+    // Crosswind camera buffeting during severe weather
+    if (Math.abs(windForce) > 0.4) {
+      this.cameraShakeIntensity = Math.max(this.cameraShakeIntensity, 0.08 * (Math.abs(windForce) / 3.0));
+    }
 
     this.playerPos.x += this.playerVelocity.x * delta;
     this.playerPos.z += this.playerVelocity.z * delta;
@@ -932,6 +1002,8 @@ export class GameEngine {
       elapsedTimeSeconds: Math.floor(this.elapsedTimeSeconds),
       rearThreats,
       criticalRearThreat,
+      activeWeatherEvent: this.weatherManager.getActiveEvent(),
+      diagnostics: this.showDiagnostics ? this.getDiagnostics() : undefined,
     });
   }
 

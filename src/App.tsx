@@ -3,7 +3,8 @@ import { GameEngine } from './game/GameEngine.ts';
 import { CARS_CATALOG, StorageManager } from './game/Storage.ts';
 import { getLevelConfig } from './game/LevelConfig.ts';
 import { soundManager } from './audio/SoundEngine.ts';
-import { CarConfig, GameSettings, GameSummary, LevelCompleteSummary, PlayerCarState } from './types.ts';
+import { Achievement, CarConfig, GameSettings, GameSummary, LevelCompleteSummary, PlayerCarState } from './types.ts';
+import { DEFAULT_ACHIEVEMENTS, evaluateAchievements } from './game/Achievements.ts';
 import { HUD } from './components/HUD.tsx';
 import { MobileControls } from './components/MobileControls.tsx';
 import { StartMenu } from './components/StartMenu.tsx';
@@ -16,6 +17,8 @@ import { GlobalLeaderboard } from './components/GlobalLeaderboard.tsx';
 import { PhotoMode } from './components/PhotoMode.tsx';
 import { LevelSelectModal } from './components/LevelSelectModal.tsx';
 import { LevelCompleteModal } from './components/LevelCompleteModal.tsx';
+import { DiagnosticOverlay } from './components/DiagnosticOverlay.tsx';
+import { AchievementNotificationOverlay } from './components/AchievementNotificationOverlay.tsx';
 import { SpeedInsights } from "@vercel/speed-insights/react"
 import { Analytics } from "@vercel/analytics/react"
 type GameMode = 'menu' | 'playing' | 'paused' | 'gameover' | 'photo';
@@ -69,6 +72,41 @@ export default function App() {
   // Touch device detection
   const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
+  // Achievement Toast Notification Queue
+  const [activeAchievement, setActiveAchievement] = useState<Achievement | null>(null);
+  const achievementQueueRef = useRef<Achievement[]>([]);
+  const isDisplayingAchievementRef = useRef(false);
+
+  const processNextAchievement = () => {
+    if (isDisplayingAchievementRef.current) return;
+    if (achievementQueueRef.current.length === 0) {
+      setActiveAchievement(null);
+      return;
+    }
+
+    const next = achievementQueueRef.current.shift()!;
+    isDisplayingAchievementRef.current = true;
+    setActiveAchievement(next);
+    soundManager.playAchievementUnlocked();
+  };
+
+  const triggerAchievementUnlock = (ach: Achievement) => {
+    achievementQueueRef.current.push(ach);
+    processNextAchievement();
+  };
+
+  const handleDismissAchievement = () => {
+    isDisplayingAchievementRef.current = false;
+    processNextAchievement();
+  };
+
+  // Fresh reference to saveData for high-frequency game loop callbacks
+  const saveDataRef = useRef(saveData);
+  saveDataRef.current = saveData;
+
+  const cumulativeDriftRef = useRef<number>(0);
+  const lastAchievementCheckTimeRef = useRef<number>(0);
+
   // Initialize GameEngine once
   useEffect(() => {
     if (!canvasMountRef.current) return;
@@ -85,6 +123,51 @@ export default function App() {
       saveData.settings,
       (state) => {
         setPlayerState(state);
+
+        if (state.isDrifting) {
+          cumulativeDriftRef.current += 0.016;
+        }
+
+        const now = performance.now();
+        // Check milestone achievements every 250ms during active gameplay
+        if (now - lastAchievementCheckTimeRef.current >= 250) {
+          lastAchievementCheckTimeRef.current = now;
+          const currentSave = saveDataRef.current;
+          const completedStages = Object.values(currentSave.levelRecords || {}).filter(
+            (r: any) => r && r.completed
+          ).length;
+
+          const { updatedAchievements, newlyUnlocked } = evaluateAchievements(
+            currentSave.achievements || DEFAULT_ACHIEVEMENTS,
+            {
+              currentSpeedKmh: state.speedKmh,
+              runDraftSeconds: state.draftTime,
+              totalDraftSeconds: (currentSave.totalDraftSeconds || 0) + state.draftTime,
+              totalDriftSeconds: (currentSave.totalDriftSeconds || 0) + cumulativeDriftRef.current,
+              nearMissCombo: state.nearMissCombo,
+              totalNearMisses: (currentSave.totalNearMisses || 0) + (state.nearMissCombo > 0 ? 1 : 0),
+              totalDistance: (currentSave.totalDistance || 0) + state.distanceMeters,
+              rivalsDefeated: currentSave.rivalsDefeated || 0,
+              completedStagesCount: completedStages,
+              unlockedCarsCount: currentSave.unlockedCars?.length || 1,
+            }
+          );
+
+          if (newlyUnlocked.length > 0) {
+            let coinsToAdd = 0;
+            for (const ach of newlyUnlocked) {
+              coinsToAdd += ach.rewardCoins;
+              triggerAchievementUnlock(ach);
+            }
+            const newSave = {
+              ...currentSave,
+              coins: currentSave.coins + coinsToAdd,
+              achievements: updatedAchievements,
+            };
+            setSaveData(newSave);
+            StorageManager.saveData(newSave);
+          }
+        }
       },
       (summary) => {
         handleGameOver(summary);
@@ -116,6 +199,7 @@ export default function App() {
     soundManager.setMuted(isMuted);
     engineRef.current?.setQuality(saveData.settings.graphicsQuality);
     engineRef.current?.setCameraMode(saveData.settings.cameraMode);
+    engineRef.current?.setShowDiagnostics(saveData.settings.showDiagnostics ?? false);
   }, [saveData.settings, isMuted]);
 
   // Global Keyboard shortcuts
@@ -243,10 +327,16 @@ export default function App() {
       : summary.timeSeconds;
     const newHighScore = Math.max(existingRecord?.highScore || 0, summary.score);
 
+    const finalDraftSeconds = (saveData.totalDraftSeconds || 0) + (playerState?.draftTime || 0);
+    const finalDriftSeconds = (saveData.totalDriftSeconds || 0) + cumulativeDriftRef.current;
+    cumulativeDriftRef.current = 0;
+
     const newSave = {
       ...saveData,
       coins: saveData.coins + summary.coinsEarned,
       unlockedLevels: newUnlocked,
+      totalDraftSeconds: finalDraftSeconds,
+      totalDriftSeconds: finalDriftSeconds,
       levelRecords: {
         ...(saveData.levelRecords || {}),
         [summary.levelId]: {
@@ -257,6 +347,31 @@ export default function App() {
         },
       },
     };
+
+    const completedStages = Object.values(newSave.levelRecords || {}).filter((r: any) => r && r.completed).length;
+    const { updatedAchievements, newlyUnlocked } = evaluateAchievements(
+      newSave.achievements || DEFAULT_ACHIEVEMENTS,
+      {
+        currentSpeedKmh: summary.topSpeed,
+        runDraftSeconds: playerState?.draftTime || 0,
+        totalDraftSeconds: finalDraftSeconds,
+        totalDriftSeconds: finalDriftSeconds,
+        nearMissCombo: 0,
+        totalNearMisses: (newSave.totalNearMisses || 0) + summary.nearMisses,
+        totalDistance: (newSave.totalDistance || 0) + summary.distance,
+        rivalsDefeated: newSave.rivalsDefeated || 0,
+        completedStagesCount: completedStages,
+        unlockedCarsCount: newSave.unlockedCars?.length || 1,
+      }
+    );
+
+    newSave.achievements = updatedAchievements;
+    if (newlyUnlocked.length > 0) {
+      for (const ach of newlyUnlocked) {
+        newSave.coins += ach.rewardCoins;
+        triggerAchievementUnlock(ach);
+      }
+    }
 
     setSaveData(newSave);
     StorageManager.saveData(newSave);
@@ -334,7 +449,10 @@ export default function App() {
   };
 
   const handleGameOver = (summary: GameSummary) => {
-    const isNewRecord = summary.score > saveData.highScore;
+    const finalDraftSeconds = (saveData.totalDraftSeconds || 0) + summary.draftTimeSeconds;
+    const finalDriftSeconds = (saveData.totalDriftSeconds || 0) + cumulativeDriftRef.current;
+    cumulativeDriftRef.current = 0;
+
     const newSave = {
       ...saveData,
       coins: saveData.coins + summary.coinsEarned,
@@ -343,6 +461,8 @@ export default function App() {
       topSpeedRecord: Math.max(saveData.topSpeedRecord, summary.topSpeed),
       totalDistance: saveData.totalDistance + summary.distance,
       totalNearMisses: saveData.totalNearMisses + summary.nearMisses,
+      totalDraftSeconds: finalDraftSeconds,
+      totalDriftSeconds: finalDriftSeconds,
     };
 
     // Update Daily Challenges progress
@@ -365,6 +485,32 @@ export default function App() {
       const completed = progress >= m.target;
       return { ...m, current: progress, completed };
     });
+
+    // Evaluate milestone achievements at end of run
+    const completedStages = Object.values(newSave.levelRecords || {}).filter((r: any) => r && r.completed).length;
+    const { updatedAchievements, newlyUnlocked } = evaluateAchievements(
+      newSave.achievements || DEFAULT_ACHIEVEMENTS,
+      {
+        currentSpeedKmh: summary.topSpeed,
+        runDraftSeconds: summary.draftTimeSeconds,
+        totalDraftSeconds: finalDraftSeconds,
+        totalDriftSeconds: finalDriftSeconds,
+        nearMissCombo: 0,
+        totalNearMisses: newSave.totalNearMisses,
+        totalDistance: newSave.totalDistance,
+        rivalsDefeated: newSave.rivalsDefeated || 0,
+        completedStagesCount: completedStages,
+        unlockedCarsCount: newSave.unlockedCars?.length || 1,
+      }
+    );
+
+    newSave.achievements = updatedAchievements;
+    if (newlyUnlocked.length > 0) {
+      for (const ach of newlyUnlocked) {
+        newSave.coins += ach.rewardCoins;
+        triggerAchievementUnlock(ach);
+      }
+    }
 
     setSaveData(newSave);
     StorageManager.saveData(newSave);
@@ -405,10 +551,38 @@ export default function App() {
 
   const handleUnlockCar = (car: CarConfig): boolean => {
     if (saveData.coins >= car.price) {
+      const newUnlockedCars = [...saveData.unlockedCars, car.id];
+      const completedStages = Object.values(saveData.levelRecords || {}).filter((r: any) => r && r.completed).length;
+
+      const { updatedAchievements, newlyUnlocked } = evaluateAchievements(
+        saveData.achievements || DEFAULT_ACHIEVEMENTS,
+        {
+          currentSpeedKmh: 0,
+          runDraftSeconds: 0,
+          totalDraftSeconds: saveData.totalDraftSeconds || 0,
+          totalDriftSeconds: saveData.totalDriftSeconds || 0,
+          nearMissCombo: 0,
+          totalNearMisses: saveData.totalNearMisses || 0,
+          totalDistance: saveData.totalDistance || 0,
+          rivalsDefeated: saveData.rivalsDefeated || 0,
+          completedStagesCount: completedStages,
+          unlockedCarsCount: newUnlockedCars.length,
+        }
+      );
+
+      let coinsBonus = 0;
+      if (newlyUnlocked.length > 0) {
+        for (const ach of newlyUnlocked) {
+          coinsBonus += ach.rewardCoins;
+          triggerAchievementUnlock(ach);
+        }
+      }
+
       const newSave = {
         ...saveData,
-        coins: saveData.coins - car.price,
-        unlockedCars: [...saveData.unlockedCars, car.id],
+        coins: saveData.coins - car.price + coinsBonus,
+        unlockedCars: newUnlockedCars,
+        achievements: updatedAchievements,
       };
       setSaveData(newSave);
       StorageManager.saveData(newSave);
@@ -521,6 +695,20 @@ export default function App() {
         <MobileControls onInput={handleMobileInput} />
       )}
 
+      {/* Real-Time Performance & GPU Diagnostic Overlay */}
+      {saveData.settings.showDiagnostics && (
+        <DiagnosticOverlay
+          diagnostics={playerState?.diagnostics}
+          engine={engineRef.current}
+          onClose={() => {
+            const newSettings: GameSettings = { ...saveData.settings, showDiagnostics: false };
+            const newSave = { ...saveData, settings: newSettings };
+            setSaveData(newSave);
+            StorageManager.saveData(newSave);
+          }}
+        />
+      )}
+
       {/* Pause Modal */}
       {gameMode === 'paused' && !levelCompleteSummary && (
         <PauseModal
@@ -528,6 +716,7 @@ export default function App() {
           onRespawnAtCheckpoint={handleRespawnAtCheckpoint}
           onRestart={handleRetryLevel}
           onOpenLevelSelect={() => setIsLevelSelectOpen(true)}
+          onOpenAchievements={() => setIsChallengesOpen(true)}
           onEnterPhotoMode={handleEnterPhotoMode}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onQuitToMenu={handleQuitToMenu}
@@ -615,11 +804,12 @@ export default function App() {
         />
       )}
 
-      {/* Daily Challenges Modal */}
+      {/* Daily Challenges & Milestone Achievements Modal */}
       {isChallengesOpen && (
         <DailyChallengesModal
           challenges={saveData.dailyChallenges}
           missions={saveData.missions}
+          achievements={saveData.achievements || DEFAULT_ACHIEVEMENTS}
           lastResetTime={saveData.dailyChallengesLastReset || Date.now()}
           onClaimDailyChallenge={handleClaimDailyChallenge}
           onClaimMission={handleClaimMission}
@@ -635,6 +825,12 @@ export default function App() {
           onClose={() => setIsSettingsOpen(false)}
         />
       )}
+
+      {/* Real-Time Achievement Unlocked Notification Toast Overlay */}
+      <AchievementNotificationOverlay
+        achievement={activeAchievement}
+        onDismiss={handleDismissAchievement}
+      />
 
       {/* Vercel Speed Insights */}
       <SpeedInsights />

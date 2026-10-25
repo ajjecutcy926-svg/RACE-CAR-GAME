@@ -1,5 +1,5 @@
 import React from 'react';
-import { Monitor, Music, Radio, Sliders, Volume2, VolumeX, X } from 'lucide-react';
+import { Activity, Monitor, Music, Radio, Sliders, Volume2, VolumeX, X } from 'lucide-react';
 import { GameSettings } from '../types.ts';
 import { RADIO_STATIONS } from '../audio/SoundEngine.ts';
 
@@ -59,6 +59,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <p className="text-[11px] text-slate-500">
               Select 'Low' on older mobile devices or low-end hardware for smoother frame rates.
             </p>
+          </div>
+
+          {/* Real-time Diagnostics Toggle Option */}
+          <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800 space-y-1.5">
+            <label htmlFor="diagnostic-overlay-toggle" className="flex items-start justify-between gap-3 cursor-pointer select-none">
+              <div className="flex items-start gap-2.5">
+                <Activity className="w-4 h-4 text-cyan-400 mt-0.5 shrink-0" />
+                <div className="space-y-0.5">
+                  <div className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                    REAL-TIME DIAGNOSTICS OVERLAY
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-mono font-normal border border-cyan-500/30">
+                      FPS • GPU • CALLS
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Display live on-screen frame rate (FPS), render frame time (ms), GPU VRAM memory usage, and WebGL draw calls.
+                  </p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                id="diagnostic-overlay-toggle"
+                name="showDiagnostics"
+                checked={settings.showDiagnostics ?? false}
+                onChange={(e) => onUpdateSettings({ ...settings, showDiagnostics: e.target.checked })}
+                className="w-5 h-5 rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-500/30 accent-cyan-500 cursor-pointer mt-0.5 shrink-0"
+              />
+            </label>
           </div>
 
           {/* Sound Effects Volume */}

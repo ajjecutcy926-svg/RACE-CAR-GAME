@@ -1,5 +1,17 @@
 export type WeatherType = 'clear' | 'sunset' | 'rain' | 'night';
 
+export type DynamicWeatherEventType = 'none' | 'dense_fog' | 'torrential_rain' | 'sandstorm';
+
+export interface DynamicWeatherEvent {
+  type: DynamicWeatherEventType;
+  name: string;
+  intensity: number; // 0 to 1
+  durationRemaining: number;
+  description: string;
+  gripModifier: number; // e.g. 0.70 to 1.0
+  windForce: number; // lateral wind drift in m/s^2
+}
+
 export type LevelTheme =
   | 'highway'
   | 'city'
@@ -120,6 +132,21 @@ export interface PlayerCarState {
   // Rear Proximity & Blind Spot Detection
   rearThreats: RearThreat[];
   criticalRearThreat: RearThreat | null;
+  // Dynamic Weather Event Telemetry
+  activeWeatherEvent: DynamicWeatherEvent | null;
+  // Real-Time Engine Diagnostics
+  diagnostics?: EngineDiagnostics;
+}
+
+export interface EngineDiagnostics {
+  fps: number;
+  frameTimeMs: number;
+  drawCalls: number;
+  triangles: number;
+  geometries: number;
+  textures: number;
+  gpuMemoryMb: number;
+  jsHeapMb?: number;
 }
 
 export interface DailyChallenge {
@@ -146,6 +173,23 @@ export interface Mission {
   metric: 'distance_total' | 'coins_total' | 'speed_record' | 'near_misses_total';
 }
 
+export type AchievementCategory = 'speed' | 'draft' | 'distance' | 'skills' | 'career';
+
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  category: AchievementCategory;
+  target: number;
+  current: number;
+  unit: string;
+  rewardCoins: number;
+  unlocked: boolean;
+  unlockedAt?: number;
+  claimed?: boolean;
+}
+
 export type RadioStationId = 'synthwave' | 'darksynth' | 'eurobeat' | 'chillwave' | 'off';
 
 export interface RadioStation {
@@ -166,6 +210,7 @@ export interface GameSettings {
   radioMuted: boolean;
   cameraMode: 'chase-close' | 'chase-far' | 'cockpit';
   touchControls: boolean;
+  showDiagnostics?: boolean;
 }
 
 export interface GameSummary {

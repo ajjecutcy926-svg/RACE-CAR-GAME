@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { PlayerCarState, RadioStationId, WeatherType, RearThreat } from '../types.ts';
 import { RADIO_STATIONS } from '../audio/SoundEngine.ts';
+import { SpeedometerGauge } from './SpeedometerGauge.tsx';
+import { useHUDScale } from '../utils/useHUDScale.ts';
 
 interface HUDProps {
   state: PlayerCarState | null;
@@ -52,6 +54,7 @@ export const HUD: React.FC<HUDProps> = ({
   popupMessage,
 }) => {
   const [radarViewMode, setRadarViewMode] = useState<'scope' | 'lanes'>('scope');
+  const scaleMetrics = useHUDScale();
 
   if (!state) return null;
 
@@ -116,11 +119,21 @@ export const HUD: React.FC<HUDProps> = ({
   );
 
   return (
-    <div className="absolute inset-0 pointer-events-none z-10 flex flex-col justify-between p-3 sm:p-5 select-none overflow-hidden">
+    <div
+      className={`absolute inset-0 pointer-events-none z-10 flex flex-col justify-between ${
+        scaleMetrics.isShortScreen ? 'p-1.5 sm:p-2.5' : 'p-3 sm:p-5'
+      } select-none overflow-hidden`}
+    >
       {/* Top Bar: Telemetry, Stage Progress, Distance, Controls */}
       <div className="flex items-start justify-between w-full gap-2">
         {/* Left Telemetry Cluster: Score & Coins */}
-        <div className="flex flex-col gap-1">
+        <div
+          className="flex flex-col gap-1 will-change-transform"
+          style={{
+            transform: `scale(${scaleMetrics.topBarScale})`,
+            transformOrigin: 'top left',
+          }}
+        >
           <div className="bg-slate-950/85 border border-slate-800/80 rounded-lg px-3 py-1.5 flex items-center gap-3 shadow-lg backdrop-blur-sm">
             <div>
               <div className="text-[10px] tracking-wider text-slate-400 font-bold uppercase">SCORE</div>
@@ -146,7 +159,13 @@ export const HUD: React.FC<HUDProps> = ({
         </div>
 
         {/* Center: Stage Progress or Distance Marker & Overhead Rear Radar Visor */}
-        <div className="flex flex-col items-center max-w-xs sm:max-w-md w-full px-1">
+        <div
+          className="flex flex-col items-center max-w-xs sm:max-w-md w-full px-1 will-change-transform"
+          style={{
+            transform: `scale(${scaleMetrics.radarScale})`,
+            transformOrigin: 'top center',
+          }}
+        >
           {state.targetDistance > 0 ? (
             /* Career Level Progress Bar */
             <div className="bg-slate-950/90 border border-slate-800/90 rounded-xl px-4 py-1.5 shadow-2xl flex flex-col items-center w-full backdrop-blur-sm">
@@ -603,11 +622,46 @@ export const HUD: React.FC<HUDProps> = ({
             </div>
           )}
 
+          {/* Active Dynamic Weather Hazard Banner */}
+          {state.activeWeatherEvent && (
+            <div className="mt-1.5 w-full bg-slate-950/95 border border-amber-500/80 px-3 py-1 rounded-xl flex items-center justify-between gap-2.5 text-xs shadow-xl backdrop-blur-md animate-pulse">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm">
+                  {state.activeWeatherEvent.type === 'sandstorm'
+                    ? '🌪️'
+                    : state.activeWeatherEvent.type === 'torrential_rain'
+                    ? '⛈️'
+                    : '🌫️'}
+                </span>
+                <span className="font-racing font-black text-amber-300 tracking-wider uppercase text-[10px] sm:text-[11px]">
+                  {state.activeWeatherEvent.name}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 font-racing text-[9px] sm:text-[10px]">
+                {state.activeWeatherEvent.gripModifier < 0.99 && (
+                  <span className="text-red-400 font-bold bg-red-950/60 px-1 rounded border border-red-500/40">
+                    GRIP {Math.round(state.activeWeatherEvent.gripModifier * 100)}%
+                  </span>
+                )}
+                {Math.abs(state.activeWeatherEvent.windForce) > 0.2 && (
+                  <span className="text-cyan-300 font-bold bg-cyan-950/60 px-1 rounded border border-cyan-500/40">
+                    WIND {state.activeWeatherEvent.windForce > 0 ? '▶' : '◀'} {Math.abs(state.activeWeatherEvent.windForce)}G
+                  </span>
+                )}
+                <span className="text-slate-400 font-bold tabular-nums">
+                  {Math.ceil(state.activeWeatherEvent.durationRemaining)}s
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Near-Miss / Event Toast Alert */}
           {popupMessage && (
             <div
               className={`mt-2 font-racing font-black text-sm sm:text-base px-4 py-1.5 rounded-lg border shadow-xl animate-pulse tracking-wider ${
-                popupMessage.type === 'radio'
+                popupMessage.type === 'weather'
+                  ? 'bg-amber-950/95 border-amber-400 text-amber-200 shadow-amber-500/30'
+                  : popupMessage.type === 'radio'
                   ? 'bg-slate-950/95 border-cyan-500 text-cyan-300 shadow-cyan-500/20'
                   : popupMessage.type === 'rival'
                   ? 'bg-amber-950/90 border-amber-500 text-amber-300'
@@ -620,7 +674,13 @@ export const HUD: React.FC<HUDProps> = ({
         </div>
 
         {/* Right Action Icons: Radio, Photo Mode, Camera, Mute, Pause */}
-        <div className="flex items-center gap-2 pointer-events-auto shrink-0">
+        <div
+          className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto shrink-0 will-change-transform"
+          style={{
+            transform: `scale(${scaleMetrics.topBarScale})`,
+            transformOrigin: 'top right',
+          }}
+        >
           {/* Dynamic Radio Quick Button */}
           {(() => {
             const currentStation = RADIO_STATIONS.find((s) => s.id === radioStation) || RADIO_STATIONS[0];
@@ -690,7 +750,13 @@ export const HUD: React.FC<HUDProps> = ({
 
       {/* Flank Blind Spot Directional Warning Indicators (Left & Right) */}
       {leftBlindSpotThreat && (
-        <div className="absolute left-3 top-1/2 -translate-y-1/2 bg-slate-950/95 border-2 border-red-500 text-red-200 px-3.5 py-2.5 rounded-xl flex items-center gap-2.5 shadow-2xl animate-pulse font-racing font-bold text-xs pointer-events-none backdrop-blur-md">
+        <div
+          className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 bg-slate-950/95 border-2 border-red-500 text-red-200 px-3.5 py-2.5 rounded-xl flex items-center gap-2.5 shadow-2xl animate-pulse font-racing font-bold text-xs pointer-events-none backdrop-blur-md will-change-transform"
+          style={{
+            transform: `translateY(-50%) scale(${scaleMetrics.hudScale})`,
+            transformOrigin: 'center left',
+          }}
+        >
           <div className="flex items-center text-red-400 text-lg font-black tracking-tighter animate-bounce">
             <span>◀</span>
             <span className="-ml-1">◀</span>
@@ -708,7 +774,13 @@ export const HUD: React.FC<HUDProps> = ({
       )}
 
       {rightBlindSpotThreat && (
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-slate-950/95 border-2 border-red-500 text-red-200 px-3.5 py-2.5 rounded-xl flex items-center gap-2.5 shadow-2xl animate-pulse font-racing font-bold text-xs pointer-events-none backdrop-blur-md">
+        <div
+          className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 bg-slate-950/95 border-2 border-red-500 text-red-200 px-3.5 py-2.5 rounded-xl flex items-center gap-2.5 shadow-2xl animate-pulse font-racing font-bold text-xs pointer-events-none backdrop-blur-md will-change-transform"
+          style={{
+            transform: `translateY(-50%) scale(${scaleMetrics.hudScale})`,
+            transformOrigin: 'center right',
+          }}
+        >
           <div className="flex flex-col text-right">
             <div className="flex items-center justify-end gap-1">
               <span className="text-[10px]">{vehicleIcons[rightBlindSpotThreat.vehicleType] || '🚗'}</span>
@@ -728,7 +800,13 @@ export const HUD: React.FC<HUDProps> = ({
       {/* Bottom Center / Right Telemetry Cluster: Speedometer, Gear, RPM, Nitro */}
       <div className="flex items-end justify-between w-full">
         {/* Left Bottom: Drifting & Combo Indicator */}
-        <div className="flex flex-col gap-1">
+        <div
+          className="flex flex-col gap-1 will-change-transform"
+          style={{
+            transform: `scale(${scaleMetrics.hudScale})`,
+            transformOrigin: 'bottom left',
+          }}
+        >
           {state.isDrifting && (
             <div className="bg-amber-600/90 text-white font-racing font-black px-3 py-1 rounded text-xs tracking-widest shadow-lg flex items-center gap-1.5 animate-pulse">
               <Flame className="w-4 h-4 text-yellow-300" />
@@ -743,60 +821,13 @@ export const HUD: React.FC<HUDProps> = ({
           )}
         </div>
 
-        {/* Right Bottom: High-Tech Racing Cluster */}
-        <div className="bg-slate-950/90 border border-slate-800/90 rounded-2xl p-3 sm:p-4 shadow-2xl flex flex-col gap-2 min-w-[210px] sm:min-w-[240px]">
-          {/* Speed & Gear */}
-          <div className="flex items-baseline justify-between">
-            <div className="flex items-baseline gap-1">
-              <span className="font-racing text-4xl sm:text-5xl font-black text-slate-100 tabular-nums tracking-tighter">
-                {state.speedKmh}
-              </span>
-              <span className="font-racing text-xs sm:text-sm text-slate-400 font-bold">KM/H</span>
-            </div>
-            {/* Gear Box */}
-            <div className="flex flex-col items-center bg-slate-900 border border-slate-800 px-3 py-1 rounded-lg">
-              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">GEAR</span>
-              <span className="font-racing text-xl font-black text-amber-400">{state.gear}</span>
-            </div>
-          </div>
-
-          {/* Tachometer RPM Bar */}
-          <div>
-            <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-1">
-              <span>RPM x1000</span>
-              <span className={isRedline ? 'text-red-400 font-black animate-pulse' : 'text-slate-300'}>
-                {(state.rpm / 1000).toFixed(1)}
-              </span>
-            </div>
-            <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden flex gap-0.5">
-              <div
-                className={`h-full transition-all duration-75 rounded-full ${
-                  isRedline ? 'bg-red-500 shadow-lg shadow-red-500/50' : 'bg-amber-400'
-                }`}
-                style={{ width: `${rpmPercent}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Nitro Boost Gauge */}
-          <div>
-            <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-1">
-              <span className="flex items-center gap-1 text-cyan-400">
-                <Zap className="w-3 h-3" /> NITRO BOOST
-              </span>
-              <span className="text-cyan-300 tabular-nums">{state.nitroGauge}%</span>
-            </div>
-            <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-75 ${
-                  state.isNitroActive
-                    ? 'bg-gradient-to-r from-cyan-400 to-blue-500 shadow-md shadow-cyan-400/50 animate-pulse'
-                    : 'bg-cyan-500'
-                }`}
-                style={{ width: `${state.nitroGauge}%` }}
-              />
-            </div>
-          </div>
+        {/* Right Bottom: High-Tech Racing Cluster with Circular Speedometer Gauge */}
+        <div className="flex flex-col items-end pointer-events-auto">
+          <SpeedometerGauge
+            state={state}
+            scale={scaleMetrics.speedometerScale}
+            compact={scaleMetrics.isCompact}
+          />
         </div>
       </div>
     </div>

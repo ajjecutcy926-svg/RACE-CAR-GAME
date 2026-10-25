@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#050814" />
+      <stop offset="50%" stop-color="#0a0f24" />
+      <stop offset="100%" stop-color="#02040a" />
+    </linearGradient>
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#06b6d4" />
+      <stop offset="100%" stop-color="#38bdf8" />
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#ef4444" />
+    </linearGradient>
+    <linearGradient id="roadGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)" />
+
+  <!-- Speed Grid / Perspective Horizon -->
+  <polygon points="100,630 500,280 700,280 1100,630" fill="url(#roadGrad)" stroke="#334155" stroke-width="2" />
+  
+  <!-- Road Center Dashed Line -->
+  <line x1="600" y1="280" x2="600" y2="630" stroke="#f59e0b" stroke-width="6" stroke-dasharray="24 16" />
+  <!-- Road Outer Stripes -->
+  <line x1="400" y1="630" x2="550" y2="280" stroke="#f8fafc" stroke-width="4" stroke-dasharray="16 12" opacity="0.6" />
+  <line x1="800" y1="630" x2="650" y2="280" stroke="#f8fafc" stroke-width="4" stroke-dasharray="16 12" opacity="0.6" />
+
+  <!-- Neon Horizon Glow Line -->
+  <line x1="0" y1="280" x2="1200" y2="280" stroke="url(#cyanGrad)" stroke-width="3" filter="url(#glow)" />
+
+  <!-- Header Category / Eyebrow -->
+  <text x="600" y="85" text-anchor="middle" fill="#06b6d4" font-family="-apple-system, sans-serif" font-size="20" font-weight="800" letter-spacing="8" filter="url(#glow)">
+    FREE ONLINE BROWSER 3D RACING GAME
+  </text>
+
+  <!-- Main Game Title -->
+  <text x="600" y="165" text-anchor="middle" fill="#ffffff" font-family="-apple-system, sans-serif" font-size="68" font-weight="900" letter-spacing="4">
+    ROAD LEGENDS: OPEN ROAD 3D
+  </text>
+
+  <!-- Subtitle Tagline -->
+  <text x="600" y="215" text-anchor="middle" fill="#94a3b8" font-family="-apple-system, sans-serif" font-size="24" font-weight="600" letter-spacing="2">
+    High-Speed Supercar Highway Racing • Procedural Traffic &amp; Weather
+  </text>
+
+  <!-- Supercar Silhouette on Road -->
+  <g transform="translate(600, 430) scale(1.6)">
+    <!-- Car body base -->
+    <path d="M -70 20 L -50 -10 L -25 -25 L 25 -25 L 50 -10 L 70 20 Z" fill="#090d16" stroke="#38bdf8" stroke-width="3" stroke-linejoin="round" />
+    <!-- Windshield -->
+    <path d="M -30 -10 L -18 -22 L 18 -22 L 30 -10 Z" fill="#06b6d4" opacity="0.8" />
+    <!-- Taillights / Headlights -->
+    <rect x="-65" y="8" width="16" height="5" rx="2" fill="#ef4444" filter="url(#glow)" />
+    <rect x="49" y="8" width="16" height="5" rx="2" fill="#ef4444" filter="url(#glow)" />
+    <rect x="-55" y="15" width="22" height="6" rx="2" fill="#f59e0b" />
+    <rect x="33" y="15" width="22" height="6" rx="2" fill="#f59e0b" />
+    <!-- Exhaust glow -->
+    <circle cx="-12" cy="22" r="5" fill="#38bdf8" filter="url(#glow)" />
+    <circle cx="12" cy="22" r="5" fill="#38bdf8" filter="url(#glow)" />
+    <!-- Rear Wing -->
+    <line x1="-55" y1="-26" x2="55" y2="-26" stroke="#f8fafc" stroke-width="4" stroke-linecap="round" />
+    <line x1="-35" y1="-26" x2="-35" y2="-18" stroke="#64748b" stroke-width="3" />
+    <line x1="35" y1="-26" x2="35" y2="-18" stroke="#64748b" stroke-width="3" />
+  </g>
+
+  <!-- Feature Pills Footer -->
+  <g transform="translate(600, 560)">
+    <!-- Pill 1 -->
+    <rect x="-440" y="-22" width="200" height="44" rx="22" fill="#0f172a" stroke="#334155" stroke-width="1.5" />
+    <text x="-340" y="6" text-anchor="middle" fill="#38bdf8" font-family="-apple-system, sans-serif" font-size="16" font-weight="700">NO DOWNLOAD</text>
+
+    <!-- Pill 2 -->
+    <rect x="-215" y="-22" width="200" height="44" rx="22" fill="#0f172a" stroke="#334155" stroke-width="1.5" />
+    <text x="-115" y="6" text-anchor="middle" fill="#f8fafc" font-family="-apple-system, sans-serif" font-size="16" font-weight="700">6 SUPERCAR MODELS</text>
+
+    <!-- Pill 3 -->
+    <rect x="15" y="-22" width="200" height="44" rx="22" fill="#0f172a" stroke="#334155" stroke-width="1.5" />
+    <text x="115" y="6" text-anchor="middle" fill="#f8fafc" font-family="-apple-system, sans-serif" font-size="16" font-weight="700">10 CAREER STAGES</text>
+
+    <!-- Pill 4 -->
+    <rect x="240" y="-22" width="200" height="44" rx="22" fill="#0f172a" stroke="#334155" stroke-width="1.5" />
+    <text x="340" y="6" text-anchor="middle" fill="#f59e0b" font-family="-apple-system, sans-serif" font-size="16" font-weight="700">100% FREE TO PLAY</text>
+  </g>
+
+  <!-- Author Badge -->
+  <text x="1150" y="605" text-anchor="end" fill="#64748b" font-family="-apple-system, sans-serif" font-size="15" font-weight="600">
+    Made by Ali Haider • 4li-gamedeveloper.vercel.app
+  </text>
+</svg>

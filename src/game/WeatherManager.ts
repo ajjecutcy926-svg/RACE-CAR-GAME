@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { LevelTheme, WeatherType } from '../types.ts';
+import { DynamicWeatherEvent, DynamicWeatherEventType, LevelTheme, WeatherType } from '../types.ts';
 
 interface WeatherPreset {
   skyColor: THREE.Color;
@@ -23,13 +23,32 @@ export class WeatherManager {
   private scene: THREE.Scene;
   private dirLight: THREE.DirectionalLight;
   private hemiLight: THREE.HemisphereLight;
+
+  // Particle systems
   private rainParticles: THREE.Points | null = null;
   private rainGeo: THREE.BufferGeometry | null = null;
   private starParticles: THREE.Points | null = null;
+  private sandParticles: THREE.Points | null = null;
+  private sandGeo: THREE.BufferGeometry | null = null;
 
   private isLevelFixed = false;
+  private currentTheme: LevelTheme = 'highway';
   private weatherCycle: WeatherType[] = ['clear', 'sunset', 'night', 'rain'];
   private cycleDistance = 1200; // transition every 1200m in endless mode
+
+  // Dynamic Mid-Race Weather Event State Machine
+  private eventPhase: 'idle' | 'warning' | 'active' | 'clearing' = 'idle';
+  private timeUntilNextEvent = 22 + Math.random() * 16; // procedural timer between 22s and 38s
+  private activeEventDuration = 0;
+  private activeEventElapsedTime = 0;
+  private currentEventType: DynamicWeatherEventType = 'none';
+  private pendingEventType: DynamicWeatherEventType = 'none';
+  private eventIntensity = 0; // 0.0 to 1.0 smooth ramp
+  private windDirection = 1; // 1 = blowing right, -1 = blowing left
+  private windGustPhase = 0;
+
+  // Alert Callback to notify GameEngine & HUD toasts
+  public onWeatherAlert: ((message: string, type: 'weather' | 'warning' | 'cleared') => void) | null = null;
 
   private presets: Record<WeatherType, WeatherPreset> = {
     clear: {
@@ -96,24 +115,25 @@ export class WeatherManager {
 
     this.initRain();
     this.initStars();
+    this.initSandstorm();
   }
 
   private initRain() {
-    const rainCount = 1800;
+    const rainCount = 2000;
     this.rainGeo = new THREE.BufferGeometry();
     const positions = new Float32Array(rainCount * 3);
 
     for (let i = 0; i < rainCount; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * 60;
-      positions[i * 3 + 1] = Math.random() * 30;
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 60;
+      positions[i * 3] = (Math.random() - 0.5) * 70;
+      positions[i * 3 + 1] = Math.random() * 32;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 70;
     }
 
     this.rainGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
     const rainMat = new THREE.PointsMaterial({
       color: 0x93c5fd,
-      size: 0.2,
+      size: 0.22,
       transparent: true,
       opacity: 0.65,
     });
@@ -152,14 +172,58 @@ export class WeatherManager {
     this.scene.add(this.starParticles);
   }
 
+  private initSandstorm() {
+    const sandCount = 1400;
+    this.sandGeo = new THREE.BufferGeometry();
+    const positions = new Float32Array(sandCount * 3);
+
+    for (let i = 0; i < sandCount; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * 65;
+      positions[i * 3 + 1] = Math.random() * 20;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 65;
+    }
+
+    this.sandGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const sandMat = new THREE.PointsMaterial({
+      color: 0xd97706,
+      size: 0.38,
+      transparent: true,
+      opacity: 0,
+    });
+
+    this.sandParticles = new THREE.Points(this.sandGeo, sandMat);
+    this.sandParticles.visible = false;
+    this.scene.add(this.sandParticles);
+  }
+
+  /**
+   * Reset procedural weather event timer on level start / retry
+   */
+  public resetEvents() {
+    this.eventPhase = 'idle';
+    this.timeUntilNextEvent = 20 + Math.random() * 18;
+    this.activeEventDuration = 0;
+    this.activeEventElapsedTime = 0;
+    this.currentEventType = 'none';
+    this.pendingEventType = 'none';
+    this.eventIntensity = 0;
+    if (this.sandParticles) {
+      this.sandParticles.visible = false;
+      (this.sandParticles.material as THREE.PointsMaterial).opacity = 0;
+    }
+  }
+
   /**
    * Configure environment weather for a specific level or theme.
    */
   public setLevelWeather(weather: WeatherType, theme: LevelTheme) {
     this.isLevelFixed = true;
+    this.currentTheme = theme;
     this.currentWeather = weather;
     this.targetWeather = weather;
     this.transitionFactor = 0;
+    this.resetEvents();
 
     // Biome-specific custom tints
     if (theme === 'desert') {
@@ -176,11 +240,18 @@ export class WeatherManager {
 
   public enableDynamicCycle() {
     this.isLevelFixed = false;
+    this.resetEvents();
   }
 
+  /**
+   * Main update tick for weather, procedural timers, particles, and physical modifiers.
+   */
   public updateDistance(distanceMeters: number, delta: number, playerPos: THREE.Vector3) {
+    // 1. Procedural Weather Event State Machine
+    this.updateDynamicWeatherEvents(delta);
+
+    // 2. Base Weather Transition (Endless cycle or Level theme)
     if (!this.isLevelFixed) {
-      // Endless mode dynamic weather cycle
       const cycleIndex = Math.floor(distanceMeters / this.cycleDistance) % this.weatherCycle.length;
       const nextIndex = (cycleIndex + 1) % this.weatherCycle.length;
       const progressInCycle = (distanceMeters % this.cycleDistance) / this.cycleDistance;
@@ -194,13 +265,12 @@ export class WeatherManager {
         this.targetWeather = this.currentWeather;
         this.transitionFactor = 0;
       }
-
-      this.applyWeather(this.currentWeather, this.targetWeather, this.transitionFactor);
-    } else {
-      this.applyWeather(this.currentWeather, this.targetWeather, 0);
     }
 
-    // Update stars follow player Z & fade in at night
+    // 3. Apply Base & Event Weather Modulations to 3D Fog and Lighting
+    this.applyWeather(this.currentWeather, this.targetWeather, this.transitionFactor);
+
+    // 4. Update Stars (Follow player and fade at night)
     if (this.starParticles) {
       this.starParticles.position.z = playerPos.z;
       const isNight = this.currentWeather === 'night' || this.targetWeather === 'night';
@@ -210,43 +280,274 @@ export class WeatherManager {
       this.starParticles.visible = mat.opacity > 0.05;
     }
 
-    // Update rain particle positions relative to player car
-    if (this.rainParticles && this.rainGeo) {
-      const isRaining = this.currentWeather === 'rain' || (this.targetWeather === 'rain' && this.transitionFactor > 0.2);
-      this.rainParticles.visible = isRaining;
+    // 5. Update Rain Particles (Dynamic intensity)
+    this.updateRainParticles(delta, playerPos);
 
-      if (isRaining) {
-        this.rainParticles.position.x = playerPos.x;
-        this.rainParticles.position.z = playerPos.z;
+    // 6. Update Sandstorm Particles (Dynamic swirling dust)
+    this.updateSandParticles(delta, playerPos);
+  }
 
-        const posAttr = this.rainGeo.attributes.position as THREE.BufferAttribute;
-        const arr = posAttr.array as Float32Array;
-        for (let i = 1; i < arr.length; i += 3) {
-          arr[i] -= 35 * delta;
-          if (arr[i] < 0) {
-            arr[i] = 25 + Math.random() * 5;
-          }
+  /**
+   * Procedural timer and state machine to trigger mid-race environmental hazards.
+   */
+  private updateDynamicWeatherEvents(delta: number) {
+    this.windGustPhase += delta * 1.5;
+
+    switch (this.eventPhase) {
+      case 'idle': {
+        this.timeUntilNextEvent -= delta;
+        // Broadcast early warning advisory at 4.5 seconds before onset
+        if (this.timeUntilNextEvent <= 4.5) {
+          this.eventPhase = 'warning';
+          this.pendingEventType = this.selectProceduralEvent();
+          const warningMessage = this.getEventWarningMessage(this.pendingEventType);
+          this.onWeatherAlert?.(warningMessage, 'warning');
         }
-        posAttr.needsUpdate = true;
+        break;
       }
+
+      case 'warning': {
+        this.timeUntilNextEvent -= delta;
+        if (this.timeUntilNextEvent <= 0) {
+          // Trigger the active event
+          this.eventPhase = 'active';
+          this.currentEventType = this.pendingEventType;
+          this.pendingEventType = 'none';
+          this.activeEventDuration = 14 + Math.random() * 8; // 14s to 22s
+          this.activeEventElapsedTime = 0;
+          this.windDirection = Math.random() > 0.5 ? 1 : -1;
+          const activeMessage = this.getEventActiveMessage(this.currentEventType);
+          this.onWeatherAlert?.(activeMessage, 'weather');
+        }
+        break;
+      }
+
+      case 'active': {
+        this.activeEventElapsedTime += delta;
+        const progress = this.activeEventElapsedTime / this.activeEventDuration;
+
+        // Smooth ease-in (first 20%) and ease-out (last 25%)
+        if (progress < 0.2) {
+          this.eventIntensity = THREE.MathUtils.lerp(0, 1, progress / 0.2);
+        } else if (progress > 0.75) {
+          this.eventIntensity = THREE.MathUtils.lerp(1, 0, (progress - 0.75) / 0.25);
+        } else {
+          this.eventIntensity = 1.0;
+        }
+
+        if (this.activeEventElapsedTime >= this.activeEventDuration) {
+          // Event completed! Clear back to normal and reward player survival
+          this.eventPhase = 'clearing';
+          const clearedMsg = `☀️ ${this.getEventName(this.currentEventType)} Cleared! Road Traction Restored`;
+          this.onWeatherAlert?.(clearedMsg, 'cleared');
+          this.currentEventType = 'none';
+          this.eventIntensity = 0;
+          this.timeUntilNextEvent = 26 + Math.random() * 24; // next event in 26-50s
+          this.eventPhase = 'idle';
+        }
+        break;
+      }
+
+      case 'clearing':
+      default:
+        this.eventPhase = 'idle';
+        break;
     }
   }
 
+  /**
+   * Procedural weather event selector weighted by the current level theme.
+   */
+  private selectProceduralEvent(): DynamicWeatherEventType {
+    const roll = Math.random();
+
+    if (this.currentTheme === 'desert') {
+      // Deserts favor intense sandstorms
+      return roll < 0.75 ? 'sandstorm' : 'dense_fog';
+    }
+
+    if (this.currentTheme === 'rainy') {
+      // Rainy tracks experience torrential downpours
+      return roll < 0.8 ? 'torrential_rain' : 'dense_fog';
+    }
+
+    if (this.currentTheme === 'mountain') {
+      // Alpine ridges favor blinding fog banks and cold rain
+      return roll < 0.65 ? 'dense_fog' : 'torrential_rain';
+    }
+
+    // Default highway / city / endless: balanced mix
+    if (roll < 0.4) return 'dense_fog';
+    if (roll < 0.75) return 'torrential_rain';
+    return 'sandstorm';
+  }
+
+  private getEventWarningMessage(type: DynamicWeatherEventType): string {
+    switch (type) {
+      case 'dense_fog':
+        return '⚠️ WEATHER ADVISORY: Dense Fog Bank Inbound — Prepare for Low Visibility!';
+      case 'torrential_rain':
+        return '⚠️ STORM WARNING: Torrential Rain Detected — Hydroplaning Hazard!';
+      case 'sandstorm':
+        return '⚠️ SEVERE WEATHER: Sandstorm Approaching — High Crosswinds!';
+      default:
+        return '⚠️ WEATHER ALERT: Atmospheric Shift Detected';
+    }
+  }
+
+  private getEventActiveMessage(type: DynamicWeatherEventType): string {
+    switch (type) {
+      case 'dense_fog':
+        return '🌫️ DENSE FOG BANK ACTIVE — Reduced Visibility Ahead!';
+      case 'torrential_rain':
+        return '⛈️ TORRENTIAL DOWNPOUR — Traction Reduced by 28%!';
+      case 'sandstorm':
+        return '🌪️ HABOOB SANDSTORM — Strong Crosswind Buffet!';
+      default:
+        return '🌪️ SEVERE WEATHER ACTIVE';
+    }
+  }
+
+  private getEventName(type: DynamicWeatherEventType): string {
+    switch (type) {
+      case 'dense_fog':
+        return 'Fog Bank';
+      case 'torrential_rain':
+        return 'Heavy Rain';
+      case 'sandstorm':
+        return 'Sandstorm';
+      default:
+        return 'Storm';
+    }
+  }
+
+  /**
+   * Update rain particle positions and speed depending on dynamic rain intensity.
+   */
+  private updateRainParticles(delta: number, playerPos: THREE.Vector3) {
+    if (!this.rainParticles || !this.rainGeo) return;
+
+    const baseRaining = this.currentWeather === 'rain' || (this.targetWeather === 'rain' && this.transitionFactor > 0.2);
+    const isTorrential = this.currentEventType === 'torrential_rain' && this.eventIntensity > 0.05;
+    const isRaining = baseRaining || isTorrential;
+
+    this.rainParticles.visible = isRaining;
+
+    if (isRaining) {
+      this.rainParticles.position.x = playerPos.x;
+      this.rainParticles.position.z = playerPos.z;
+
+      const mat = this.rainParticles.material as THREE.PointsMaterial;
+      const targetOpacity = isTorrential ? 0.92 : 0.65;
+      mat.opacity = THREE.MathUtils.damp(mat.opacity, targetOpacity, 3.0, delta);
+      mat.size = isTorrential ? 0.32 : 0.22;
+
+      const fallSpeed = isTorrential ? 56 : 35;
+      const posAttr = this.rainGeo.attributes.position as THREE.BufferAttribute;
+      const arr = posAttr.array as Float32Array;
+      for (let i = 1; i < arr.length; i += 3) {
+        arr[i] -= fallSpeed * delta;
+        if (arr[i] < 0) {
+          arr[i] = 26 + Math.random() * 6;
+        }
+      }
+      posAttr.needsUpdate = true;
+    }
+  }
+
+  /**
+   * Update sandstorm particles with lateral crosswind swirl across camera view.
+   */
+  private updateSandParticles(delta: number, playerPos: THREE.Vector3) {
+    if (!this.sandParticles || !this.sandGeo) return;
+
+    const isSandstorm = this.currentEventType === 'sandstorm' && this.eventIntensity > 0.05;
+    this.sandParticles.visible = isSandstorm;
+
+    if (isSandstorm) {
+      this.sandParticles.position.x = playerPos.x;
+      this.sandParticles.position.z = playerPos.z;
+
+      const mat = this.sandParticles.material as THREE.PointsMaterial;
+      mat.opacity = THREE.MathUtils.damp(mat.opacity, this.eventIntensity * 0.78, 4.0, delta);
+
+      const lateralWind = this.windDirection * (24 + Math.sin(this.windGustPhase) * 12);
+      const posAttr = this.sandGeo.attributes.position as THREE.BufferAttribute;
+      const arr = posAttr.array as Float32Array;
+
+      for (let i = 0; i < arr.length; i += 3) {
+        // X movement: high lateral swirl
+        arr[i] += lateralWind * delta;
+        if (arr[i] > 35) arr[i] = -35;
+        if (arr[i] < -35) arr[i] = 35;
+
+        // Y movement: turbulent rise and fall
+        arr[i + 1] -= (8 + Math.sin(i) * 4) * delta;
+        if (arr[i + 1] < 0.2) {
+          arr[i + 1] = 16 + Math.random() * 4;
+        }
+
+        // Z movement: relative forward/backward stream
+        arr[i + 2] -= 18 * delta;
+        if (arr[i + 2] < -35) {
+          arr[i + 2] = 35;
+        }
+      }
+      posAttr.needsUpdate = true;
+    }
+  }
+
+  /**
+   * Applies base weather blended with active procedural weather events to the scene.
+   */
   private applyWeather(from: WeatherType, to: WeatherType, t: number) {
     const fromP = this.presets[from];
     const toP = this.presets[to];
 
-    // Lerp colors & intensities
+    // Lerp baseline colors & intensities
     const sky = fromP.skyColor.clone().lerp(toP.skyColor, t);
     const fog = fromP.fogColor.clone().lerp(toP.fogColor, t);
-    const fogDens = THREE.MathUtils.lerp(fromP.fogDensity, toP.fogDensity, t);
+    let fogDens = THREE.MathUtils.lerp(fromP.fogDensity, toP.fogDensity, t);
 
     const dirCol = fromP.dirLightColor.clone().lerp(toP.dirLightColor, t);
-    const dirInt = THREE.MathUtils.lerp(fromP.dirLightIntensity, toP.dirLightIntensity, t);
+    let dirInt = THREE.MathUtils.lerp(fromP.dirLightIntensity, toP.dirLightIntensity, t);
 
     const hemiSky = fromP.hemiSkyColor.clone().lerp(toP.hemiSkyColor, t);
     const hemiGnd = fromP.hemiGroundColor.clone().lerp(toP.hemiGroundColor, t);
-    const hemiInt = THREE.MathUtils.lerp(fromP.hemiIntensity, toP.hemiIntensity, t);
+    let hemiInt = THREE.MathUtils.lerp(fromP.hemiIntensity, toP.hemiIntensity, t);
+
+    // Apply procedural mid-race weather event modulations
+    if (this.currentEventType !== 'none' && this.eventIntensity > 0) {
+      const eInt = this.eventIntensity;
+
+      if (this.currentEventType === 'dense_fog') {
+        // Dense Fog: Sky dims, thick misty silver-slate fog up to 0.016
+        const fogEventColor = new THREE.Color(0x64748b);
+        fog.lerp(fogEventColor, eInt * 0.85);
+        sky.lerp(new THREE.Color(0x334155), eInt * 0.7);
+        fogDens = THREE.MathUtils.lerp(fogDens, 0.016, eInt);
+        dirInt *= 1 - eInt * 0.55;
+        hemiInt *= 1 - eInt * 0.4;
+      } else if (this.currentEventType === 'torrential_rain') {
+        // Torrential Downpour: Dark storm clouds, gloomy atmospheric lighting
+        const stormSky = new THREE.Color(0x0f172a);
+        const stormFog = new THREE.Color(0x1e293b);
+        sky.lerp(stormSky, eInt * 0.9);
+        fog.lerp(stormFog, eInt * 0.85);
+        fogDens = THREE.MathUtils.lerp(fogDens, 0.0098, eInt);
+        dirInt *= 1 - eInt * 0.65;
+        hemiInt *= 1 - eInt * 0.45;
+      } else if (this.currentEventType === 'sandstorm') {
+        // Sandstorm: Golden-amber dust haze, dim ochre sun
+        const sandSky = new THREE.Color(0x78350f);
+        const sandFog = new THREE.Color(0xd97706);
+        sky.lerp(sandSky, eInt * 0.92);
+        fog.lerp(sandFog, eInt * 0.9);
+        fogDens = THREE.MathUtils.lerp(fogDens, 0.015, eInt);
+        dirCol.lerp(new THREE.Color(0xf59e0b), eInt * 0.8);
+        dirInt *= 1 - eInt * 0.5;
+      }
+    }
 
     this.scene.background = sky;
     if (this.scene.fog instanceof THREE.FogExp2) {
@@ -261,7 +562,70 @@ export class WeatherManager {
     this.hemiLight.intensity = hemiInt;
   }
 
+  /**
+   * Road is wet if baseline weather is rainy OR if a torrential rain event is active.
+   */
   public isWetRoad(): boolean {
-    return this.currentWeather === 'rain' || (this.targetWeather === 'rain' && this.transitionFactor > 0.4);
+    const isBaseRain = this.currentWeather === 'rain' || (this.targetWeather === 'rain' && this.transitionFactor > 0.4);
+    const isTorrential = this.currentEventType === 'torrential_rain' && this.eventIntensity > 0.15;
+    return isBaseRain || isTorrential;
+  }
+
+  /**
+   * Physics traction multiplier based on weather conditions (1.0 = dry asphalt, ~0.72 = flooded downpour).
+   */
+  public getGripModifier(): number {
+    let grip = 1.0;
+
+    // Baseline wet road
+    if (this.isWetRoad()) {
+      grip *= 0.78;
+    }
+
+    // Dynamic weather event modifiers
+    if (this.currentEventType === 'torrential_rain' && this.eventIntensity > 0) {
+      grip *= THREE.MathUtils.lerp(1.0, 0.72, this.eventIntensity);
+    } else if (this.currentEventType === 'sandstorm' && this.eventIntensity > 0) {
+      grip *= THREE.MathUtils.lerp(1.0, 0.82, this.eventIntensity); // loose dust/sand on asphalt
+    } else if (this.currentEventType === 'dense_fog' && this.eventIntensity > 0) {
+      grip *= THREE.MathUtils.lerp(1.0, 0.90, this.eventIntensity); // condensation moisture
+    }
+
+    return grip;
+  }
+
+  /**
+   * Physical lateral wind force (m/s^2) applied to the player's car during storms.
+   */
+  public getWindForce(): number {
+    if (this.currentEventType === 'sandstorm' && this.eventIntensity > 0.05) {
+      const gust = Math.sin(this.windGustPhase * 1.8) * 0.8 + Math.cos(this.windGustPhase * 3.2) * 0.4;
+      return this.windDirection * (2.8 + gust) * this.eventIntensity;
+    }
+    if (this.currentEventType === 'torrential_rain' && this.eventIntensity > 0.1) {
+      return this.windDirection * Math.sin(this.windGustPhase) * 1.2 * this.eventIntensity;
+    }
+    return 0;
+  }
+
+  /**
+   * Telemetry object for UI / HUD consumption.
+   */
+  public getActiveEvent(): DynamicWeatherEvent | null {
+    if (this.currentEventType === 'none' || this.eventIntensity <= 0.02) {
+      return null;
+    }
+
+    const durationRemaining = Math.max(0, this.activeEventDuration - this.activeEventElapsedTime);
+
+    return {
+      type: this.currentEventType,
+      name: this.getEventName(this.currentEventType),
+      intensity: Number(this.eventIntensity.toFixed(2)),
+      durationRemaining: Number(durationRemaining.toFixed(1)),
+      description: this.getEventActiveMessage(this.currentEventType),
+      gripModifier: Number(this.getGripModifier().toFixed(2)),
+      windForce: Number(this.getWindForce().toFixed(2)),
+    };
   }
 }

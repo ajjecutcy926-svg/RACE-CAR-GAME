@@ -1,4 +1,5 @@
-import { CarConfig, DailyChallenge, GameSettings, LevelRecord, Mission } from '../types.ts';
+import { Achievement, CarConfig, DailyChallenge, GameSettings, LevelRecord, Mission } from '../types.ts';
+import { DEFAULT_ACHIEVEMENTS } from './Achievements.ts';
 
 export const CARS_CATALOG: CarConfig[] = [
   {
@@ -137,6 +138,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   radioMuted: false,
   cameraMode: 'chase-close',
   touchControls: false,
+  showDiagnostics: false,
 };
 
 const DEFAULT_MISSIONS: Mission[] = [
@@ -207,6 +209,16 @@ export class StorageManager {
           if (parsed.selectedLevel === undefined) {
             parsed.selectedLevel = 1;
           }
+          if (!parsed.achievements || !Array.isArray(parsed.achievements)) {
+            parsed.achievements = DEFAULT_ACHIEVEMENTS;
+          } else {
+            parsed.achievements = DEFAULT_ACHIEVEMENTS.map((def) => {
+              const existing = parsed.achievements.find((a: any) => a.id === def.id);
+              return existing ? { ...def, ...existing } : def;
+            });
+          }
+          if (parsed.totalDraftSeconds === undefined) parsed.totalDraftSeconds = 0;
+          if (parsed.totalDriftSeconds === undefined) parsed.totalDriftSeconds = 0;
           return parsed;
         }
       }
@@ -239,6 +251,9 @@ export class StorageManager {
       totalDistance: 0,
       totalNearMisses: 0,
       rivalsDefeated: 0,
+      totalDraftSeconds: 0,
+      totalDriftSeconds: 0,
+      achievements: DEFAULT_ACHIEVEMENTS,
       dailyChallengesLastReset: 0,
       dailyChallenges: [] as DailyChallenge[],
       missions: DEFAULT_MISSIONS,

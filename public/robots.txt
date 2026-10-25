@@ -1,0 +1,25 @@
+# Robots.txt for Road Legends: Open Road 3D
+# Production URL: https://4li-gamedeveloper.vercel.app/
+
+User-agent: *
+Allow: /
+Disallow: /api/
+
+# Crawler-specific directives
+User-agent: Googlebot
+Allow: /
+Disallow: /api/
+
+User-agent: Googlebot-Image
+Allow: /
+Allow: /*.svg$
+Allow: /*.png$
+Allow: /*.jpg$
+Allow: /*.webp$
+
+User-agent: Bingbot
+Allow: /
+Disallow: /api/
+
+# Sitemap location
+Sitemap: https://4li-gamedeveloper.vercel.app/sitemap.xml

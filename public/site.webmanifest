@@ -1,0 +1,19 @@
+{
+  "name": "Road Legends: Open Road 3D",
+  "short_name": "Road Legends",
+  "description": "Play Road Legends: Open Road 3D, a free online car racing game in your browser with no download. Drive 6 supercars, draft rivals, and race across 10 levels.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07090e",
+  "theme_color": "#090a10",
+  "orientation": "landscape-primary",
+  "categories": ["games", "entertainment", "sports"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

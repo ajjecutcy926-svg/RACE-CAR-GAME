@@ -80,7 +80,10 @@ export const StartMenu: React.FC<StartMenuProps> = ({
             </svg>
           </div>
 
-          <h1 className="font-racing text-5xl sm:text-7xl md:text-8xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-100 to-slate-400 drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]">
+          <h1
+            aria-label="Road Legends: Open Road 3D – Free Car Racing Game"
+            className="font-racing text-5xl sm:text-7xl md:text-8xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-100 to-slate-400 drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]"
+          >
             ROAD LEGENDS
           </h1>
           <p className="font-hud text-sm sm:text-base text-slate-300 tracking-widest mt-1 uppercase font-semibold">

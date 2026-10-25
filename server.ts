@@ -220,6 +220,25 @@ app.post('/api/leaderboard', (req, res) => {
   });
 });
 
+// Explicit SEO endpoints for robots.txt and sitemap.xml
+app.get('/robots.txt', (_req, res) => {
+  const robotsPath = path.join(__dirname, 'public', 'robots.txt');
+  if (fs.existsSync(robotsPath)) {
+    res.type('text/plain').sendFile(robotsPath);
+  } else {
+    res.type('text/plain').send('User-agent: *\nAllow: /\nSitemap: https://4li-gamedeveloper.vercel.app/sitemap.xml\n');
+  }
+});
+
+app.get('/sitemap.xml', (_req, res) => {
+  const sitemapPath = path.join(__dirname, 'public', 'sitemap.xml');
+  if (fs.existsSync(sitemapPath)) {
+    res.type('application/xml').sendFile(sitemapPath);
+  } else {
+    res.status(404).send('Sitemap not found');
+  }
+});
+
 async function startServer() {
   const isDev = process.env.NODE_ENV !== 'production';
 
